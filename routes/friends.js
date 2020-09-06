@@ -73,4 +73,13 @@ router.post("/addfriend", authorization, async (req, res) => {
   }
 });
 
+//cancel a friend request
+router.post("/cancelrequest", authorization, async (req, res) => {
+  try {
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json(err.message);
+  }
+});
+
 module.exports = router;
