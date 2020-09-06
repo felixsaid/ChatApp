@@ -12,7 +12,7 @@ const io = socketIo(server);
 io.of("/friendsIo").on("connect", (socket) => {
   socket.emit("requestIdFromServer");
   socket.on("idToServer", (data) => {
-    socket.join(Number(data));
+    socket.join(String(data));
   });
 });
 
@@ -74,8 +74,75 @@ router.post("/addfriend", authorization, async (req, res) => {
 });
 
 //cancel a friend request
-router.post("/cancelrequest", authorization, async (req, res) => {
+router.delete("/cancelrequest", authorization, async (req, res) => {
   try {
+    const { email } = req.body;
+    const ownId = req.user;
+
+    const getFriendRequest = await pool.query(
+      "SELECT * FROM users WHERE user_email = $1",
+      [email]
+    );
+
+    const friendId = getFriendRequest.rows[0].userid;
+
+    const getReq = await pool.query(
+      "SELECT * FROM user_friends WHERE user_id = $1 AND friend_id = $2",
+      [ownId, friendId]
+    );
+
+    const requestId = getReq.rows[0].friedship_id;
+
+    const deleteRequest = await pool.query(
+      "DELETE FROM user_friends WHERE friedship_id = $1",
+      [requestId]
+    );
+
+    let message = "Friend request was rejected";
+
+    return res.status(202).send({ error: false, data: null, message: message });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json(err.message);
+  }
+});
+
+//accept a friend request
+router.post("/acceptrequest", authorization, async (req, res) => {
+  try {
+    const { email } = req.body;
+    const ownId = req.user;
+
+    const getFriendRequest = await pool.query(
+      "SELECT * FROM users WHERE user_email = $1",
+      [email]
+    );
+
+    const friendId = getFriendRequest.rows[0].userid;
+    const friendStatus = "Friends";
+
+    const getReq = await pool.query(
+      "SELECT * FROM user_friends WHERE user_id = $1 AND friend_id = $2",
+      [ownId, friendId]
+    );
+
+    const requestId = getReq.rows[0].friedship_id;
+
+    const acceptRequest = await pool.query(
+      "UPDATE user_friends SET friend_status = $1 WHERE friedship_id = $2",
+      [friendStatus, requestId]
+    );
+
+    let message = "Friend request was accepted";
+    let friendRightData = {
+      username: getFriendRequest.rows[0].user_name,
+      useremail: email,
+    };
+    io.of("/friendsIo")
+      .to(String(req.user))
+      .emit("acceptedRequest", friendRightData);
+
+    return res.status(202).send({ error: false, data: null, message: message });
   } catch (err) {
     console.error(err.message);
     res.status(500).json(err.message);
